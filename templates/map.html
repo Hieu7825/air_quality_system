@@ -1,0 +1,451 @@
+{% extends "base.html" %} {% block title %}Bản đồ - Hệ thống Giám sát Chất lượng
+Không khí{% endblock %} {% block head %}
+<style>
+  @keyframes pulse {
+    0% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.1);
+    }
+    100% {
+      transform: scale(1);
+    }
+  }
+
+  .measurements-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin: 12px 0;
+  }
+
+  .measurement-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 0;
+    border-bottom: 1px solid #e5e7eb;
+  }
+</style>
+{% endblock %} {% block content %}
+<div class="map-container">
+  <div class="page-header">
+    <h1 class="animate__animated animate__fadeInDown">
+      <i class="fas fa-map-marked-alt"></i>
+      Bản đồ Giám sát Chất lượng Không khí
+    </h1>
+    <p class="animate__animated animate__fadeInUp animate__delay-1s">
+      Theo dõi chất lượng không khí thời gian thực tại các điểm cảm biến trong
+      thành phố
+    </p>
+  </div>
+
+  <!-- Map Controls Panel -->
+  <div
+    class="map-controls animate__animated animate__fadeInUp animate__delay-2s"
+  >
+    <div class="control-panel">
+      <div class="control-group">
+        <label class="control-label">
+          <i class="fas fa-layer-group"></i> Hiển thị:
+        </label>
+        <div class="control-buttons">
+          <button class="control-btn active" data-layer="all">
+            <i class="fas fa-eye"></i> Tất cả
+          </button>
+          <button class="control-btn" data-layer="good">
+            <i class="fas fa-check-circle"></i> Tốt
+          </button>
+          <button class="control-btn" data-layer="moderate">
+            <i class="fas fa-exclamation-circle"></i> Trung bình
+          </button>
+          <button class="control-btn" data-layer="poor">
+            <i class="fas fa-times-circle"></i> Kém
+          </button>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <label class="control-label">
+          <i class="fas fa-sync-alt"></i> Tự động cập nhật:
+        </label>
+        <label class="toggle-switch">
+          <input type="checkbox" id="autoRefresh" checked />
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <!-- Map Container -->
+  <div
+    class="map-wrapper animate__animated animate__fadeInUp animate__delay-3s"
+  >
+    <div id="map"></div>
+
+    <!-- Map Overlay Info -->
+    <div class="map-overlay">
+      <div class="overlay-content">
+        <h3><i class="fas fa-info-circle"></i> Thông tin</h3>
+        <div class="overlay-stats" id="mapStats">
+          <div class="overlay-stat">
+            <span class="stat-label">Tổng cảm biến:</span>
+            <span class="stat-value" id="totalSensors">--</span>
+          </div>
+          <div class="overlay-stat">
+            <span class="stat-label">Đang hoạt động:</span>
+            <span class="stat-value" id="activeSensors">--</span>
+          </div>
+          <div class="overlay-stat">
+            <span class="stat-label">Cập nhật lần cuối:</span>
+            <span class="stat-value" id="lastUpdate">--</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %} {% block scripts %}
+<script src="{{ url_for('static', filename='js/map.js') }}"></script>
+<script>
+  // Enhanced map functionality
+  document.addEventListener("DOMContentLoaded", () => {
+    // Control panel functionality
+    document.querySelectorAll(".control-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        // Update active button
+        document
+          .querySelectorAll(".control-btn")
+          .forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+
+        // Filter markers based on selection
+        const layer = btn.dataset.layer;
+        if (window.airQualityMap) {
+          window.airQualityMap.filterMarkers(layer);
+        }
+
+        playSound("click");
+      });
+    });
+
+    // Auto refresh toggle
+    const autoRefreshToggle = document.getElementById("autoRefresh");
+    autoRefreshToggle.addEventListener("change", (e) => {
+      if (window.airQualityMap) {
+        if (e.target.checked) {
+          window.airQualityMap.startAutoRefresh();
+        } else {
+          window.airQualityMap.stopAutoRefresh();
+        }
+      }
+      playSound("click");
+    });
+
+    // Update map stats
+    updateMapStats();
+    setInterval(updateMapStats, 30000); // Update every 30 seconds
+  });
+
+  async function updateMapStats() {
+    try {
+      const response = await fetch("/api/sensors");
+      const sensors = await response.json();
+
+      const totalSensors = sensors.length;
+      const activeSensors = sensors.filter((s) => s.status === "active").length;
+      const lastUpdate = new Date().toLocaleTimeString("vi-VN");
+
+      document.getElementById("totalSensors").textContent = totalSensors;
+      document.getElementById("activeSensors").textContent = activeSensors;
+      document.getElementById("lastUpdate").textContent = lastUpdate;
+    } catch (error) {
+      console.error("Error updating map stats:", error);
+    }
+  }
+
+  // Extend AirQualityMap class with filter functionality
+  if (window.AirQualityMap) {
+    window.AirQualityMap.prototype.filterMarkers = function (layer) {
+      this.markers.forEach((marker) => {
+        const sensor = this.sensors.find(
+          (s) =>
+            s.latitude === marker.getLatLng().lat &&
+            s.longitude === marker.getLatLng().lng
+        );
+
+        if (!sensor || !sensor.latest_measurement) {
+          marker.addTo(this.map);
+          return;
+        }
+
+        const pm25 = sensor.latest_measurement.pm25;
+        let show = true;
+
+        switch (layer) {
+          case "good":
+            show = pm25 <= 50;
+            break;
+          case "moderate":
+            show = pm25 > 50 && pm25 <= 100;
+            break;
+          case "poor":
+            show = pm25 > 100;
+            break;
+          case "all":
+          default:
+            show = true;
+            break;
+        }
+
+        if (show) {
+          marker.addTo(this.map);
+        } else {
+          this.map.removeLayer(marker);
+        }
+      });
+    };
+
+    window.AirQualityMap.prototype.stopAutoRefresh = function () {
+      if (this.refreshInterval) {
+        clearInterval(this.refreshInterval);
+        this.refreshInterval = null;
+      }
+    };
+
+    window.AirQualityMap.prototype.startAutoRefresh = function () {
+      this.stopAutoRefresh();
+      this.refreshInterval = setInterval(() => {
+        this.refreshData();
+      }, 5 * 60 * 1000);
+    };
+  }
+</script>
+
+<style>
+  .map-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 1rem;
+  }
+
+  .page-header {
+    text-align: center;
+    margin-bottom: 2rem;
+    color: white;
+  }
+
+  .page-header h1 {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+    font-weight: 700;
+  }
+
+  .page-header p {
+    font-size: 1.1rem;
+    opacity: 0.9;
+    max-width: 600px;
+    margin: 0 auto;
+  }
+
+  .map-controls {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: var(--border-radius);
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    box-shadow: var(--shadow-lg);
+  }
+
+  .control-panel {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 2rem;
+    flex-wrap: wrap;
+  }
+
+  .control-group {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .control-label {
+    font-weight: 600;
+    color: var(--dark-color);
+    white-space: nowrap;
+  }
+
+  .control-buttons {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .control-btn {
+    padding: 0.5rem 1rem;
+    border: 2px solid #e5e7eb;
+    background: white;
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    transition: var(--transition);
+    font-size: 0.9rem;
+    font-weight: 500;
+  }
+
+  .control-btn:hover {
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+    transform: translateY(-2px);
+  }
+
+  .control-btn.active {
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+    box-shadow: var(--shadow-md);
+  }
+
+  .toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 60px;
+    height: 34px;
+  }
+
+  .toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+
+  .slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: var(--transition);
+    border-radius: 34px;
+  }
+
+  .slider:before {
+    position: absolute;
+    content: "";
+    height: 26px;
+    width: 26px;
+    left: 4px;
+    bottom: 4px;
+    background-color: white;
+    transition: var(--transition);
+    border-radius: 50%;
+    box-shadow: var(--shadow-sm);
+  }
+
+  input:checked + .slider {
+    background: var(--primary-color);
+  }
+
+  input:checked + .slider:before {
+    transform: translateX(26px);
+  }
+
+  .map-wrapper {
+    position: relative;
+    border-radius: var(--border-radius);
+    overflow: hidden;
+    box-shadow: var(--shadow-xl);
+  }
+
+  #map {
+    height: 600px;
+    width: 100%;
+  }
+
+  .map-overlay {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: var(--border-radius);
+    padding: 1.5rem;
+    box-shadow: var(--shadow-lg);
+    min-width: 200px;
+    z-index: 1000;
+  }
+
+  .overlay-content h3 {
+    margin: 0 0 1rem 0;
+    color: var(--primary-color);
+    font-size: 1.1rem;
+    font-weight: 600;
+  }
+
+  .overlay-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .overlay-stat {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.25rem 0;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  .overlay-stat:last-child {
+    border-bottom: none;
+  }
+
+  .stat-label {
+    font-size: 0.9rem;
+    color: #6b7280;
+  }
+
+  .stat-value {
+    font-weight: 600;
+    color: var(--dark-color);
+    font-size: 0.9rem;
+  }
+
+  @media (max-width: 768px) {
+    .control-panel {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 1rem;
+    }
+
+    .control-group {
+      justify-content: space-between;
+    }
+
+    .control-buttons {
+      flex-wrap: wrap;
+    }
+
+    .control-btn {
+      font-size: 0.8rem;
+      padding: 0.4rem 0.8rem;
+    }
+
+    .map-overlay {
+      position: static;
+      margin-bottom: 1rem;
+    }
+
+    #map {
+      height: 400px;
+    }
+
+    .page-header h1 {
+      font-size: 2rem;
+    }
+  }
+</style>
+{% endblock %}

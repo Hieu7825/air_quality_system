@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>
+      {% block title %}Hệ thống Giám sát Chất lượng Không khí{% endblock %}
+    </title>
+
+    <!-- CSS Libraries -->
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+
+    <!-- Custom CSS -->
+    <link
+      href="{{ url_for('static', filename='css/style.css') }}"
+      rel="stylesheet"
+    />
+
+    {% block head %}{% endblock %}
+  </head>
+  <body>
+    <!-- Navigation -->
+    <nav class="navbar">
+      <div class="nav-container">
+        <div class="nav-brand">
+          <i class="fas fa-wind"></i>
+          <span>AirQuality Monitor</span>
+        </div>
+        <ul class="nav-menu">
+          <li class="nav-item">
+            <a href="{{ url_for('index') }}" class="nav-link">
+              <i class="fas fa-home"></i> Trang chủ
+            </a>
+          </li>
+          <li class="nav-item">
+            <a href="{{ url_for('map_view') }}" class="nav-link">
+              <i class="fas fa-map-marked-alt"></i> Bản đồ
+            </a>
+          </li>
+          <li class="nav-item">
+            <a href="{{ url_for('charts_view') }}" class="nav-link">
+              <i class="fas fa-chart-line"></i> Biểu đồ
+            </a>
+          </li>
+        </ul>
+        <div class="hamburger">
+          <span class="bar"></span>
+          <span class="bar"></span>
+          <span class="bar"></span>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">{% block content %}{% endblock %}</main>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <div class="footer-content">
+        <p>
+          &copy; 2025 Air Quality Monitoring System. Được phát triển với ❤️ tại
+          Việt Nam.
+        </p>
+      </div>
+    </footer>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay">
+      <div class="spinner"></div>
+      <p>Đang tải dữ liệu...</p>
+    </div>
+
+    <!-- JavaScript Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- Custom JavaScript -->
+    <script src="{{ url_for('static', filename='js/sounds.js') }}"></script>
+    <script>
+      // Mobile menu toggle
+      const hamburger = document.querySelector(".hamburger");
+      const navMenu = document.querySelector(".nav-menu");
+
+      hamburger.addEventListener("click", () => {
+        hamburger.classList.toggle("active");
+        navMenu.classList.toggle("active");
+        playSound("click");
+      });
+
+      // Close menu when clicking on a link
+      document.querySelectorAll(".nav-link").forEach((n) =>
+        n.addEventListener("click", () => {
+          hamburger.classList.remove("active");
+          navMenu.classList.remove("active");
+        })
+      );
+
+      // Add hover sound effects
+      document.querySelectorAll(".nav-link, .btn, .card").forEach((element) => {
+        element.addEventListener("mouseenter", () => playSound("hover"));
+      });
+
+      // Loading overlay functions
+      function showLoading() {
+        document.getElementById("loading-overlay").style.display = "flex";
+      }
+
+      function hideLoading() {
+        document.getElementById("loading-overlay").style.display = "none";
+      }
+
+      // Hide loading on page load
+      window.addEventListener("load", hideLoading);
+    </script>
+
+    {% block scripts %}{% endblock %}
+  </body>
+</html>

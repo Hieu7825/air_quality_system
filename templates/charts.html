@@ -1,0 +1,335 @@
+{% extends "base.html" %} {% block title %}Biểu đồ - Hệ thống Giám sát Chất
+lượng Không khí{% endblock %} {% block head %} {# CSS riêng cho trang biểu đồ,
+được đặt trong head để tối ưu việc tải trang #}
+<style>
+  /* Các biến CSS này nên được định nghĩa trong file style.css chung của bạn */
+  :root {
+    --primary-color: #3b82f6;
+    --dark-color: #1f2937;
+    --border-radius: 12px;
+    --transition: all 0.3s ease-in-out;
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
+      0 2px 4px -2px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1),
+      0 4px 6px -4px rgba(0, 0, 0, 0.1);
+    --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1),
+      0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  }
+
+  .charts-page-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 1rem 2rem 3rem 2rem;
+  }
+  .page-header {
+    text-align: center;
+    margin-bottom: 3rem;
+    color: #333; /* Đổi màu chữ để dễ đọc hơn trên nền sáng */
+  }
+  .page-header h1 {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+  }
+  .page-header p {
+    font-size: 1.1rem;
+    opacity: 0.8;
+    max-width: 700px;
+    margin: 0 auto;
+  }
+  .chart-controls {
+    background: #ffffff;
+    border-radius: var(--border-radius);
+    padding: 1.5rem;
+    margin-bottom: 3rem;
+    box-shadow: var(--shadow-lg);
+  }
+  .controls-panel {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 2rem;
+    flex-wrap: wrap;
+  }
+  .control-group {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+  .control-label {
+    font-weight: 600;
+    color: var(--dark-color);
+    white-space: nowrap;
+  }
+  .sensor-select {
+    padding: 0.75rem 1rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    background: white;
+    font-size: 1rem;
+    min-width: 250px;
+    transition: var(--transition);
+    cursor: pointer;
+  }
+  .sensor-select:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+  }
+  .time-range-buttons {
+    display: flex;
+    gap: 0.5rem;
+  }
+  .time-range-btn {
+    padding: 0.75rem 1.5rem;
+    border: 1px solid #e5e7eb;
+    background: white;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: var(--transition);
+    font-weight: 500;
+  }
+  .time-range-btn:hover {
+    background-color: #f3f4f6;
+    border-color: #d1d5db;
+  }
+  .time-range-btn.active {
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+    box-shadow: var(--shadow-md);
+  }
+  .charts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+    gap: 2rem;
+    margin-bottom: 3rem;
+  }
+  .chart-card {
+    background: #ffffff;
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+    transition: var(--transition);
+    display: flex;
+    flex-direction: column;
+  }
+  .chart-card:hover {
+    transform: translateY(-5px);
+    box-shadow: var(--shadow-xl);
+  }
+  .chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  .chart-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--dark-color);
+    margin: 0;
+  }
+  .chart-info {
+    color: #6b7280;
+    cursor: help;
+    transition: var(--transition);
+  }
+  .chart-info:hover {
+    color: var(--primary-color);
+  }
+  .chart-body {
+    padding: 1.5rem;
+    height: 350px;
+    position: relative;
+    flex-grow: 1;
+  }
+  .export-section {
+    margin-top: 3rem;
+  }
+  .export-card {
+    background: #ffffff;
+    border-radius: var(--border-radius);
+    padding: 2rem;
+    text-align: center;
+    box-shadow: var(--shadow-lg);
+  }
+  .export-card h3 {
+    margin-bottom: 1rem;
+    font-size: 1.5rem;
+  }
+  .export-card p {
+    color: #6b7280;
+    margin-bottom: 2rem;
+  }
+  .export-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+  .tooltip-popup {
+    position: fixed;
+    background: rgba(0, 0, 0, 0.85);
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    max-width: 220px;
+    z-index: 10000;
+    opacity: 0;
+    transition: opacity 0.2s ease-in-out;
+    pointer-events: none;
+    transform: translate(-50%, -100%); /* Căn giữa và đặt trên con trỏ */
+  }
+  .tooltip-popup.show {
+    opacity: 1;
+  }
+  @media (max-width: 768px) {
+    .controls-panel {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .charts-grid {
+      grid-template-columns: 1fr;
+    }
+    .chart-body {
+      height: 300px;
+    }
+  }
+</style>
+{% endblock %} {% block content %}
+<div class="charts-page-container">
+  <div class="page-header">
+    <h1 class="animate__animated animate__fadeInDown">
+      <i class="fas fa-chart-line"></i> Phân tích Chất lượng Không khí
+    </h1>
+    <p class="animate__animated animate__fadeInUp animate__delay-1s">
+      Phân tích xu hướng và so sánh dữ liệu qua các biểu đồ trực quan.
+    </p>
+  </div>
+
+  <!-- Bảng điều khiển -->
+  <div
+    class="chart-controls animate__animated animate__fadeInUp animate__delay-2s"
+  >
+    <div class="controls-panel">
+      <div class="control-group">
+        <label class="control-label"
+          ><i class="fas fa-map-marker-alt"></i> Chọn cảm biến:</label
+        >
+        <select class="sensor-select">
+          <option value="">Đang tải...</option>
+        </select>
+      </div>
+      <div class="control-group">
+        <label class="control-label"
+          ><i class="fas fa-clock"></i> Khoảng thời gian:</label
+        >
+        <div class="time-range-buttons">
+          <button class="time-range-btn active" data-hours="24">24 giờ</button>
+          <button class="time-range-btn" data-hours="72">3 ngày</button>
+          <button class="time-range-btn" data-hours="168">7 ngày</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Lưới biểu đồ -->
+  <div class="charts-grid">
+    <div
+      class="chart-card animate__animated animate__fadeInUp animate__delay-3s"
+    >
+      <div class="chart-header">
+        <h3 class="chart-title"><i class="fas fa-smog"></i> Chỉ số PM2.5</h3>
+        <span
+          class="chart-info"
+          data-tooltip="PM2.5 là hạt bụi mịn có đường kính ≤ 2.5 micromet, rất nguy hiểm cho sức khỏe."
+          ><i class="fas fa-info-circle"></i
+        ></span>
+      </div>
+      <div class="chart-body"><canvas id="pm25Chart"></canvas></div>
+    </div>
+    <div
+      class="chart-card animate__animated animate__fadeInUp animate__delay-4s"
+    >
+      <div class="chart-header">
+        <h3 class="chart-title">
+          <i class="fas fa-thermometer-half"></i> Nhiệt độ & Độ ẩm
+        </h3>
+        <span
+          class="chart-info"
+          data-tooltip="Nhiệt độ và độ ẩm là các yếu tố môi trường ảnh hưởng đến sự khuếch tán của chất ô nhiễm."
+          ><i class="fas fa-info-circle"></i
+        ></span>
+      </div>
+      <div class="chart-body"><canvas id="tempHumidityChart"></canvas></div>
+    </div>
+    <div
+      class="chart-card animate__animated animate__fadeInUp animate__delay-5s"
+    >
+      <div class="chart-header">
+        <h3 class="chart-title">
+          <i class="fas fa-layer-group"></i> Các chỉ số chính
+        </h3>
+        <span
+          class="chart-info"
+          data-tooltip="Hiển thị đồng thời PM2.5, PM10, CO và NO₂ trên hai trục tung khác nhau để dễ so sánh."
+          ><i class="fas fa-info-circle"></i
+        ></span>
+      </div>
+      <div class="chart-body"><canvas id="multiParamChart"></canvas></div>
+    </div>
+    <div
+      class="chart-card animate__animated animate__fadeInUp animate__delay-6s"
+    >
+      <div class="chart-header">
+        <h3 class="chart-title">
+          <i class="fas fa-balance-scale"></i> So sánh Trung bình
+        </h3>
+        <span
+          class="chart-info"
+          data-tooltip="So sánh giá trị trung bình của cảm biến được chọn với trung bình của toàn bộ hệ thống."
+          ><i class="fas fa-info-circle"></i
+        ></span>
+      </div>
+      <!-- FIX: Đổi ID thành 'averageComparisonChart' để khớp với JS -->
+      <div class="chart-body">
+        <canvas id="averageComparisonChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Khu vực xuất dữ liệu -->
+  <div
+    class="export-section animate__animated animate__fadeInUp animate__delay-7s"
+  >
+    <div class="export-card">
+      <h3><i class="fas fa-download"></i> Xuất Dữ liệu</h3>
+      <p>Tải xuống dữ liệu của cảm biến đang chọn để phân tích hoặc lưu trữ.</p>
+      <div class="export-buttons">
+        <!-- FIX: Cập nhật hàm onclick để gọi phương thức từ đối tượng class -->
+        <button class="btn" onclick="window.airQualityCharts.exportData('csv')">
+          <i class="fas fa-file-csv"></i> Xuất CSV
+        </button>
+        <button
+          class="btn btn-secondary"
+          onclick="window.airQualityCharts.exportData('json')"
+        >
+          <i class="fas fa-file-code"></i> Xuất JSON
+        </button>
+        <button
+          class="btn btn-success"
+          onclick="window.airQualityCharts.exportChartImage('pm25Chart', 'pm25_chart.png')"
+        >
+          <i class="fas fa-image"></i> Xuất ảnh PM2.5
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %} {% block scripts %} {# Chỉ cần nạp file JS đã được tích hợp đầy
+đủ #}
+<script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+{% endblock %}

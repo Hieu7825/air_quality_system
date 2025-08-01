@@ -1,0 +1,300 @@
+{% extends "base.html" %} {% block title %}Trang chủ - Hệ thống Giám sát Chất
+lượng Không khí{% endblock %} {% block content %}
+<!-- Hero Section -->
+<section class="hero">
+  <div class="container">
+    <h1 class="animate__animated animate__fadeInUp">
+      Hệ thống Giám sát Chất lượng Không khí
+    </h1>
+    <p class="animate__animated animate__fadeInUp animate__delay-1s">
+      Theo dõi chất lượng không khí thời gian thực tại các khu vực trong thành
+      phố
+    </p>
+    <div
+      class="hero-actions animate__animated animate__fadeInUp animate__delay-2s"
+    >
+      <a href="{{ url_for('map_view') }}" class="btn btn-primary">
+        <i class="fas fa-map-marked-alt"></i> Xem Bản đồ
+      </a>
+      <a href="{{ url_for('charts_view') }}" class="btn btn-secondary">
+        <i class="fas fa-chart-line"></i> Xem Biểu đồ
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- Statistics Section -->
+<section class="stats-section">
+  <div class="stats-container" id="statsContainer">
+    <!-- Stats will be loaded dynamically -->
+  </div>
+</section>
+
+<!-- Features Section -->
+<section class="features-section">
+  <div class="container">
+    <div class="features-grid">
+      <div class="feature-card animate__animated animate__fadeInLeft">
+        <div class="feature-icon">
+          <i class="fas fa-map-marked-alt"></i>
+        </div>
+        <h3>Bản đồ Tương tác</h3>
+        <p>
+          Xem vị trí các cảm biến trên bản đồ với thông tin chi tiết về chất
+          lượng không khí tại từng điểm.
+        </p>
+      </div>
+
+      <div class="feature-card animate__animated animate__fadeInUp">
+        <div class="feature-icon">
+          <i class="fas fa-chart-line"></i>
+        </div>
+        <h3>Biểu đồ Phân tích</h3>
+        <p>
+          Theo dõi xu hướng biến đổi chất lượng không khí qua các biểu đồ trực
+          quan và dễ hiểu.
+        </p>
+      </div>
+
+      <div class="feature-card animate__animated animate__fadeInRight">
+        <div class="feature-icon">
+          <i class="fas fa-clock"></i>
+        </div>
+        <h3>Cập nhật Thời gian thực</h3>
+        <p>
+          Dữ liệu được cập nhật liên tục để cung cấp thông tin chính xác nhất về
+          chất lượng không khí.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %} {% block scripts %}
+<script>
+  // Load statistics on page load
+  document.addEventListener("DOMContentLoaded", async () => {
+    await loadStatistics();
+
+    // Add animation classes to stats cards
+    setTimeout(() => {
+      document.querySelectorAll(".stat-card").forEach((card, index) => {
+        card.classList.add("animate__animated", "animate__bounceIn");
+        card.style.animationDelay = `${index * 0.2}s`;
+      });
+    }, 500);
+  });
+
+  async function loadStatistics() {
+    try {
+      showLoading();
+      const response = await fetch("/api/statistics");
+      const stats = await response.json();
+
+      const statsContainer = document.getElementById("statsContainer");
+      statsContainer.innerHTML = `
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-smog"></i>
+                </div>
+                <div class="stat-value">${stats.avg_pm25}</div>
+                <div class="stat-label">PM2.5 Trung bình (µg/m³)</div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-cloud"></i>
+                </div>
+                <div class="stat-value">${stats.avg_pm10}</div>
+                <div class="stat-label">PM10 Trung bình (µg/m³)</div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-thermometer-half"></i>
+                </div>
+                <div class="stat-value">${stats.avg_temperature}°C</div>
+                <div class="stat-label">Nhiệt độ Trung bình</div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-tint"></i>
+                </div>
+                <div class="stat-value">${stats.avg_humidity}%</div>
+                <div class="stat-label">Độ ẩm Trung bình</div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-broadcast-tower"></i>
+                </div>
+                <div class="stat-value">${stats.active_sensors}</div>
+                <div class="stat-label">Cảm biến Hoạt động</div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-database"></i>
+                </div>
+                <div class="stat-value">${stats.total_measurements}</div>
+                <div class="stat-label">Số liệu trong 1h</div>
+            </div>
+        `;
+
+      playSound("notification");
+    } catch (error) {
+      console.error("Error loading statistics:", error);
+      document.getElementById("statsContainer").innerHTML = `
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-exclamation-triangle"></i>
+                </div>
+                <div class="stat-value">Lỗi</div>
+                <div class="stat-label">Không thể tải dữ liệu</div>
+            </div>
+        `;
+    } finally {
+      hideLoading();
+    }
+  }
+</script>
+
+<style>
+  .hero {
+    text-align: center;
+    padding: 6rem 1rem 4rem;
+    background: var(--gradient-primary);
+    color: white;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .hero::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000"><defs><radialGradient id="a" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="%23ffffff" stop-opacity="0.1"/><stop offset="100%" stop-color="%23ffffff" stop-opacity="0"/></radialGradient></defs><circle cx="500" cy="500" r="400" fill="url(%23a)"/></svg>')
+      center/cover;
+    opacity: 0.1;
+  }
+
+  .hero .container {
+    position: relative;
+    z-index: 1;
+    max-width: 800px;
+    margin: 0 auto;
+  }
+
+  .hero h1 {
+    font-size: 3.5rem;
+    font-weight: 700;
+    margin-bottom: 1.5rem;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+  }
+
+  .hero p {
+    font-size: 1.3rem;
+    margin-bottom: 2.5rem;
+    opacity: 0.95;
+    line-height: 1.6;
+  }
+
+  .hero-actions {
+    display: flex;
+    gap: 1.5rem;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .stats-section {
+    padding: 2rem 0 4rem;
+    position: relative;
+    margin-top: -2rem;
+  }
+
+  .features-section {
+    padding: 4rem 0;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+  }
+
+  .features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 1rem;
+  }
+
+  .feature-card {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    padding: 2.5rem;
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-xl);
+    text-align: center;
+    transition: var(--transition);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .feature-card::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: var(--gradient-primary);
+  }
+
+  .feature-card:hover {
+    transform: translateY(-10px);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  }
+
+  .feature-icon {
+    font-size: 3.5rem;
+    margin-bottom: 1.5rem;
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .feature-card h3 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--dark-color);
+    margin-bottom: 1rem;
+  }
+
+  .feature-card p {
+    color: #6b7280;
+    line-height: 1.6;
+  }
+
+  @media (max-width: 768px) {
+    .hero h1 {
+      font-size: 2.5rem;
+    }
+
+    .hero p {
+      font-size: 1.1rem;
+    }
+
+    .hero-actions {
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .features-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+{% endblock %}# Air Quality Monitoring System - Complete Project Structure
